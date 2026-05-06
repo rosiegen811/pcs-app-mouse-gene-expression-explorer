@@ -1,0 +1,197 @@
+{% if gene %}
+
+{% if not differential_expression and not sample_rows and not across_ages %}
+    <p class="error-message">
+        No data found for gene "{{ gene }}". Try another gene.
+    </p>
+{% endif %}
+
+<section>
+    <h2>Gene Detail: {{ gene }}</h2>
+
+    <div style="margin-bottom:10px;">
+        <span class="pill"><b>Species:</b> Mouse</span>
+        <span class="pill"><b>Selected gene:</b> {{ gene }}</span>
+        <span class="pill"><b>Tissue:</b> {{ tissue }}</span>
+        <span class="pill"><b>Age:</b> {{ age }}</span>
+        <span class="pill"><b>Sex:</b> {{ sex }}</span>
+        <span class="pill"><b>Genotype:</b> {{ genotype }}</span>
+        <span class="pill"><b>Diet:</b> {{ diet }}</span>
+        <span class="pill"><b>Contrast:</b> {{ contrast }}</span>
+    </div>
+
+    <div class="links" style="margin: 10px 0;">
+        <b>External links:</b>
+        <a href="https://www.ensembl.org/Mus_musculus/Gene/Summary?g={{ gene.lower() }}"
+           target="_blank"
+           rel="noopener noreferrer">
+           Ensembl
+        </a>
+        <a href="https://search.brain-map.org/search/index.html?query={{ gene.lower() }}" target="_blank" rel="noopener noreferrer">Allen Brain Atlas</a>
+        <a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ gene }}" target="_blank" rel="noopener noreferrer">NCBI</a>
+        <a href="https://pubmed.ncbi.nlm.nih.gov/?term={{ gene.lower() }}&sort=date" target="_blank" rel="noopener noreferrer">PubMed</a>
+        <a href="https://scholar.google.com/scholar?q={{ gene.lower() }}" target="_blank" rel="noopener noreferrer">Google Scholar</a>
+        <a href="https://www.uniprot.org/uniprotkb?query={{ gene }}" target="_blank" rel="noopener noreferrer">UniProt</a>
+        <a href="https://www.omim.org/search?search={{ gene.lower() }}"
+           target="_blank"
+           rel="noopener noreferrer">
+           OMIM
+        </a>
+    </div>
+
+    <div class="two-col">
+        <div>
+        {% if show_de %}
+            <h3>Differential Expression</h3>
+            <table>
+                <thead>
+                <tr>
+                    <th>Contrast</th>
+                    <th>Tissue</th>
+                    <th>Age</th>
+                    <th>FDR</th>
+                    <th>log2 Fold Change</th>
+                </tr>
+                </thead>
+            
+                <tbody>
+                {% for row in differential_expression %}
+                <tr>
+                    <td>{{ row.contrast }}</td>
+                    <td>{{ row.tissue }}</td>
+                    <td>{{ row.age }} months</td>
+                    <td>{{ row.fdr }}</td>
+                    <td>{{ row.log2fc }}</td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5">No differential expression result found for this gene and selected contrast.</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        {% endif %}
+
+            <h3>Expression Summary by Group</h3>
+            {% if expression_summary %}
+            <table>
+                <tr>
+                    <th>Group</th>
+                    <th>n samples</th>
+                    <th>Mean Expression</th>
+                    <th>Median Expression</th>
+                </tr>
+            
+                {% for row in expression_summary %}
+                <tr>
+                    <td>{{ row.group }}</td>
+                    <td>{{ row.n }}</td>
+                    <td>{{ row.mean }}</td>
+                    <td>{{ row.median }}</td>
+                </tr>
+                {% endfor %}
+            </table>
+            {% else %}
+            <p>No expression summary available for this gene.</p>
+            {% endif %}
+        </div>
+
+        <div>
+            <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+                <h3 style="margin:0;">Expression Plot</h3>
+        
+                <button onclick="downloadPlot()">Download PNG</button>
+            </div>
+        
+            <canvas id="expressionChart"></canvas>
+        </div>
+    </div>
+</section>
+
+<section>
+    <h2>Per-sample Expression and Metadata</h2>
+    
+    <div style="margin-bottom: 10px;">
+        <button onclick="downloadDEResults('csv')">Download CSV</button>
+        <button onclick="downloadDEResults('tsv')">Download TSV</button>
+    </div>
+
+    <table>
+        <tr>
+            <th>Sample ID</th>
+            <th>Mouse ID</th>
+            <th>Genotype</th>
+            <th>Diet</th>
+            <th>Sex</th>
+            <th>Age</th>
+            <th>Tissue</th>
+            <th>Expression</th>
+        </tr>
+        
+        {% for row in sample_rows %}
+        <tr>
+            <td>S{{ row.mouse_id }}</td>
+            <td>{{ row.mouse_id }}</td>
+            <td>{{ row.genotype }}</td>
+            <td>{{ row.diet }}</td>
+            <td>{{ row.sex }}</td>
+            <td>{{ row.age }} months</td>
+            <td>{{ row.tissue }}</td>
+            <td>{{ row.expression }}</td>
+        </tr>
+        {% else %}
+        <tr>
+            <td colspan="8">No sample-level expression data found.</td>
+        </tr>
+        {% endfor %}
+    </table>
+</section>
+
+{% if contrast != "All" and contrast != "None" %}
+<section>
+    <h2>Across Ages Summary</h2>
+    <p class="note">
+        Showing {{ contrast }} across ages, grouped by tissue.
+    </p>
+    
+    {% if across_ages %}
+    <table>
+        <tr>
+            <th>Tissue</th>
+            <th>Age</th>
+            <th>log2 Fold Change</th>
+            <th>FDR</th>
+        </tr>
+    
+        {% for row in across_ages %}
+        <tr>
+            <td>{{ row.tissue }}</td>
+            <td>{{ row.age }} months</td>
+            <td>{{ row.log2fc }}</td>
+            <td>{{ row.fdr }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+    <p>No across-age data available for this gene and contrast.</p>
+    {% endif %}
+    
+</section>
+{% elif contrast == "All" %}
+<section>
+    <h2>Across Ages Summary</h2>
+    <p class="note">
+        Across-age results are hidden when 'All contrasts' is selected because multiple contrasts exist at each age. Select one contrast to compare that result across ages.
+    </p>
+</section>
+{% endif %}
+
+<script type="application/json" id="sampleRowsData">
+    {{ sample_rows | tojson }}
+</script>
+
+<script type="application/json" id="geneNameData">
+    {{ gene | tojson }}
+</script>
+
+{% endif %}

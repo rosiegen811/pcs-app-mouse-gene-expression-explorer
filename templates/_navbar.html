@@ -1,0 +1,42 @@
+<nav class="top-nav">
+    <a href="{{ url_for('home') }}"
+       class="nav-link {% if active_page == 'home' %}active{% endif %}">
+       Dashboard
+    </a>
+
+    <a href="{{ url_for('gene_lookup') }}"
+       class="nav-link remember-tab {% if active_page == 'gene_lookup' %}active{% endif %}"
+       data-page="gene_lookup">
+       Gene Lookup
+    </a>
+
+    <a href="{{ url_for('contrast_results') }}"
+       class="nav-link remember-tab {% if active_page == 'contrast_results' %}active{% endif %}"
+       data-page="contrast_results">
+       Differential Results
+    </a>
+
+    <a href="{{ url_for('help_page') }}"
+       class="nav-link {% if active_page == 'help' %}active{% endif %}">
+       Help
+    </a>
+</nav>
+
+<script>
+(function () {
+    const pageKey = document.body.dataset.page;
+
+    if (pageKey === "gene_lookup" || pageKey === "contrast_results") {
+        localStorage.setItem(`lastUrl_${pageKey}`, window.location.pathname + window.location.search);
+    }
+
+    document.querySelectorAll(".remember-tab").forEach(link => {
+        const targetPage = link.dataset.page;
+        const savedUrl = localStorage.getItem(`lastUrl_${targetPage}`);
+
+        if (savedUrl) {
+            link.href = savedUrl;
+        }
+    });
+})();
+</script>

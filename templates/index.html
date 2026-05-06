@@ -1,0 +1,66 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>{{ title }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-page="home">
+{% include "_navbar.html" %}
+
+<header>
+<h1>{{ title }}</h1>
+<p class="subtitle">Search expression data across age, sex, genotype, and diet — view gene-level summaries and external links.</p>
+</header>
+
+<section>
+<h2>Dataset Summary</h2>
+<div class="summary">
+    <div class="summary-box highlight">
+        <h3>Samples</h3>
+        <p class="big-number">{{ total_samples | default('192') }}</p>
+    </div>
+    <div class="summary-box highlight">
+        <h3>Genes Measured</h3>
+        <p class="big-number">{{ total_genes | default('22,000+') }}</p>
+    </div>
+    <div class="summary-box">
+        <h3>Data Structure</h3>
+        <p>Sex, Age, Diet, Genotype, Gene</p>
+    </div>
+    <div class="summary-box">
+        <h3>Ages</h3>
+        <p>3, 6, 9, 12 months</p>
+    </div>
+    <div class="summary-box">
+        <h3>Biological Variables</h3>
+        <p>APP vs WT<br>Control vs Supplemented</p>
+    </div>
+</div>
+</section>
+
+<section>
+    <h2>Database Functions</h2>
+    <div class="functions-grid">
+        <a href="{{ url_for('gene_lookup') }}" class="function-card">
+            <span class="function-icon">🔍</span>
+            <h3>Single Gene Expression Lookup</h3>
+            <p>View expression levels for any gene across all conditions</p>
+        </a>
+        <a href="{{ url_for('contrast_results') }}" class="function-card">
+            <span class="function-icon">⚖️</span>
+            <h3>Differential Expression Results</h3>
+            <p>Browse significant DE genes across contrasts</p>
+        </a>
+        <a href="{{ url_for('help_page') }}" class="function-card">
+            <span class="function-icon">📚</span>
+            <h3>Help & User Guide</h3>
+            <p>Learn how to use this database and interpret results</p>
+        </a>
+    </div>
+</section>
+
+<footer>
+    <p>BF768 Final Project — <a href="{{ url_for('help_page') }}">Team 10</a></p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>{{ title }}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@sgratzl/chartjs-chart-boxplot"></script>
+</head>
+
+<body data-page="gene_lookup">
+{% include "_navbar.html" %}
+<header>
+    <h1>{{ title }}</h1>
+    </header>
+
+<section>
+    <h2>Gene Search</h2>
+    
+    <form id="geneSearchForm" method="GET" action="{{ url_for('gene_lookup') }}">
+        <div class="grid">
+            <div>
+                <label for="gene">Gene</label>
+                <input type="text" id="gene" name="gene" placeholder="e.g., BDNF" value="{{ gene }}">
+            </div>
+        
+            <div>
+                <label for="tissue">Tissue</label>
+                <select id="tissue" name="tissue">
+                    <option value="All" {% if tissue == "All" %}selected{% endif %}>All Tissues</option>
+                    <option value="Cortex" {% if tissue == "Cortex" %}selected{% endif %}>Cortex</option>
+                    <option value="Hippocampus" {% if tissue == "Hippocampus" %}selected{% endif %}>Hippocampus</option>
+                </select>
+            </div>
+        
+            <div>
+                <label for="age">Age</label>
+                <select id="age" name="age">
+                    <option value="All" {% if age == "All" %}selected{% endif %}>All ages</option>
+                    <option value="3" {% if age == "3" %}selected{% endif %}>3 months</option>
+                    <option value="6" {% if age == "6" %}selected{% endif %}>6 months</option>
+                    <option value="9" {% if age == "9" %}selected{% endif %}>9 months</option>
+                    <option value="12" {% if age == "12" %}selected{% endif %}>12 months</option>
+                </select>
+            </div>
+        
+            <div>
+                <label for="contrast">Contrast</label>
+                <select id="contrast" name="contrast">
+                    <option value="None" {% if contrast == "None" %}selected{% endif %}>None</option>
+                    <option value="All" {% if contrast == "All" %}selected{% endif %}>All contrasts</option>
+                    <option value="APP vs WT" {% if contrast == "APP vs WT" %}selected{% endif %}>APP vs WT</option>
+                    <option value="APP Supplemented vs APP Control" {% if contrast == "APP Supplemented vs APP Control" %}selected{% endif %}>APP Supplemented vs APP Control</option>
+                    <option value="WT Supplemented vs WT Control" {% if contrast == "WT Supplemented vs WT Control" %}selected{% endif %}>WT Supplemented vs WT Control</option>
+                </select>
+            </div>
+        </div>
+
+        <div class="grid three-col">
+            <div>
+                <label for="genotype">Genotype</label>
+                <select id="genotype" name="genotype">
+                    <option value="All" {% if genotype == "All" %}selected{% endif %}>All</option>
+                    <option value="WT" {% if genotype == "WT" %}selected{% endif %}>WT</option>
+                    <option value="APP" {% if genotype == "APP" %}selected{% endif %}>APP</option>
+                </select>
+            </div>
+        
+            <div>
+                <label for="sex">Sex</label>
+                <select id="sex" name="sex">
+                    <option value="All" {% if sex == "All" %}selected{% endif %}>All</option>
+                    <option value="F" {% if sex == "F" %}selected{% endif %}>Female</option>
+                    <option value="M" {% if sex == "M" %}selected{% endif %}>Male</option>
+                </select>
+            </div>
+        
+            <div>
+                <label for="diet">Diet</label>
+                <select id="diet" name="diet">
+                    <option value="All" {% if diet == "All" %}selected{% endif %}>All</option>
+                    <option value="Control" {% if diet == "Control" %}selected{% endif %}>Control</option>
+                    <option value="Supplemented" {% if diet == "Supplemented" %}selected{% endif %}>Supplemented</option>
+                </select>
+            </div>
+        </div>  
+
+        <div style="margin-top:14px;">
+            <button type="submit">Run Gene Lookup</button>
+            <button type="button" class="secondary" id="resetGeneSearch">Reset</button>
+        </div>
+
+        <p class="note">
+            Search for individual genes and view expression levels across experimental conditions. 
+            Popular genes: Bdnf, Grn, Itgax, Apoe, Mapt.<br>
+            <em style="display:block; margin-top:5px; opacity:0.8;">
+                Note: Selecting a contrast will disable genotype and diet filters, and vice versa.
+            </em>
+        </p>
+    </form>
+</section>
+
+<div id="loadingMessage" style="display:none; margin-top:15px;">
+    <p class="note"><span class="spinner"></span>Loading gene results...</p>
+</div>
+
+<!-- RESULTS OUTPUT -->
+
+<div id="resultsArea">
+    {% if gene %}
+        {% include "gene_lookup_results.html" %}
+    {% endif %}
+</div>
+
+<script>
+let expressionChart;
+
+function initExpressionChart() {
+    const sampleRowsEl = document.getElementById("sampleRowsData");
+    const geneNameEl = document.getElementById("geneNameData");
+    
+    if (!sampleRowsEl || !geneNameEl) {
+        return;
+    }
+    
+    const sampleRows = JSON.parse(sampleRowsEl.textContent);
+    const geneName = JSON.parse(geneNameEl.textContent);
+    
+    const grouped = {};
+    
+    sampleRows.forEach(row => {
+        let group = row.genotype;
+
+        if (row.diet === "Supplemented") {
+            group = `${row.genotype} Supplemented`;
+        } else if (row.diet === "Control") {
+            group = `${row.genotype} Control`;
+        }
+
+        const value = Number(row.expression);
+    
+        if (!grouped[group]) {
+            grouped[group] = [];
+        }
+    
+        if (!isNaN(value)) {
+            grouped[group].push(value);
+        }
+    });
+    
+    const labels = Object.keys(grouped);
+    const boxplotData = labels.map(group => grouped[group]);
+    
+    const scatterData = [];
+    
+    labels.forEach((group, groupIndex) => {
+        grouped[group].forEach((value, sampleIndex) => {
+            const jitter = ((sampleIndex % 5) - 2) * 0.025;
+        
+            scatterData.push({
+                x: groupIndex + jitter,
+                y: value
+            });
+        });
+    });
+    
+    const ctx = document.getElementById("expressionChart");
+    
+    if (ctx && labels.length > 0) {
+        if (expressionChart) {
+            expressionChart.destroy();
+        }
+    
+        expressionChart = new Chart(ctx, {
+            data: {
+                labels: labels,
+                datasets: [
+                    {
+                        type: "boxplot",
+                        label: `${geneName} expression distribution`,
+                        data: boxplotData,
+                        backgroundColor: "rgba(54, 162, 235, 0.35)",
+                        borderColor: "rgba(54, 162, 235, 1)",
+                        borderWidth: 1,
+                    },
+                    {
+                        type: "scatter",
+                        label: "Individual samples",
+                        data: scatterData,
+                        backgroundColor: "rgba(0, 0, 0, 0.65)",
+                        pointRadius: 4,
+                        xAxisID: "xScatter"
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                plugins: {
+                    title: {
+                        display: true,
+                        text: `${geneName} sample-level expression by contrast group`
+                    }
+                },
+                scales: {
+                    x: {
+                        title: {
+                            display: true,
+                            text: "Genotype"
+                        }
+                    },
+                    xScatter: {
+                        type: "linear",
+                        position: "bottom",
+                        min: -0.5,
+                        max: labels.length - 0.5,
+                        display: false
+                    },
+                    y: {
+                        beginAtZero: false,
+                        title: {
+                            display: true,
+                            text: "Normalised Expression"
+                        }
+                    }
+                }
+            }
+        });
+    }
+}
+
+function downloadDEResults(format) {
+    const sampleRowsEl = document.getElementById("sampleRowsData");
+    const geneNameEl = document.getElementById("geneNameData");
+    const geneName = geneNameEl ? JSON.parse(geneNameEl.textContent) : "gene";
+    
+    if (!sampleRowsEl) {
+        alert("No sample-level data available to download.");
+        return;
+    }
+    
+    const rows = JSON.parse(sampleRowsEl.textContent);
+
+    if (!rows || rows.length === 0) {
+        alert("No sample-level data available to download.");
+        return;
+    }
+
+    const delimiter = format === "tsv" ? "\t" : ",";
+
+    const headers = [
+        "Sample ID",
+        "Mouse ID",
+        "Genotype",
+        "Diet",
+        "Sex",
+        "Age",
+        "Tissue",
+        "Expression"
+    ];
+
+    const dataRows = rows.map(row => [
+        `S${row.mouse_id}`,
+        row.mouse_id,
+        row.genotype,
+        row.diet,
+        row.sex,
+        `${row.age} months`,
+        row.tissue,
+        row.expression
+    ]);
+
+    const fileContent = [
+        headers,
+        ...dataRows
+    ].map(row =>
+        row.map(value => `"${String(value ?? "").replaceAll('"', '""')}"`).join(delimiter)
+    ).join("\n");
+
+    const blob = new Blob([fileContent], {
+        type: format === "tsv" ? "text/tab-separated-values" : "text/csv"
+    });
+
+    const link = document.createElement("a");
+    link.href = URL.createObjectURL(blob);
+    link.download = `${geneName}_sample_expression_metadata.${format}`;
+    link.click();
+
+    URL.revokeObjectURL(link.href);
+}
+
+function downloadPlot() {
+    const geneNameEl = document.getElementById("geneNameData");
+    const geneName = geneNameEl ? JSON.parse(geneNameEl.textContent) : "gene";
+
+    if (!expressionChart) {
+        alert("No plot available to download.");
+        return;
+    }
+
+    const canvas = expressionChart.canvas;
+    const ctx = canvas.getContext("2d");
+
+    // create temp canvas
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+
+    const tempCtx = tempCanvas.getContext("2d");
+
+    // white background
+    tempCtx.fillStyle = "#ffffff";
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+
+    // draw chart on top
+    tempCtx.drawImage(canvas, 0, 0);
+
+    const link = document.createElement("a");
+    link.href = tempCanvas.toDataURL("image/png");
+    link.download = `${geneName}_boxplot_expression_plot.png`;
+    link.click();
+}
+
+</script>
+
+<script>
+function updateFiltersState() {
+    const contrastEl = document.getElementById("contrast");
+    const genotypeEl = document.getElementById("genotype");
+    const dietEl = document.getElementById("diet");
+
+    const contrast = contrastEl.value;
+    const genotype = genotypeEl.value;
+    const diet = dietEl.value;
+
+    const contrastSelected = contrast !== "None" && contrast !== "All";
+    const filtersSelected = genotype !== "All" || diet !== "All";
+
+    if (contrastSelected) {
+        // disable genotype + diet
+        genotypeEl.disabled = true;
+        dietEl.disabled = true;
+
+        contrastEl.disabled = false;
+
+        genotypeEl.style.opacity = 0.5;
+        dietEl.style.opacity = 0.5;
+        contrastEl.style.opacity = 1;
+
+        genotypeEl.value = "All";
+        dietEl.value = "All";
+    } 
+    else if (filtersSelected) {
+        // disable contrast
+        contrastEl.disabled = true;
+
+        genotypeEl.disabled = false;
+        dietEl.disabled = false;
+
+        contrastEl.style.opacity = 0.5;
+        genotypeEl.style.opacity = 1;
+        dietEl.style.opacity = 1;
+
+        contrastEl.value = "None";
+    } 
+    else {
+        // everything enabled
+        contrastEl.disabled = false;
+        genotypeEl.disabled = false;
+        dietEl.disabled = false;
+
+        contrastEl.style.opacity = 1;
+        genotypeEl.style.opacity = 1;
+        dietEl.style.opacity = 1;
+    }
+
+    // labels
+    document.querySelector('label[for="contrast"]').style.opacity = filtersSelected ? 0.5 : 1;
+    document.querySelector('label[for="genotype"]').style.opacity = contrastSelected ? 0.5 : 1;
+    document.querySelector('label[for="diet"]').style.opacity = contrastSelected ? 0.5 : 1;
+}
+
+document.addEventListener("DOMContentLoaded", () => {
+    updateFiltersState();
+
+    document.getElementById("contrast").addEventListener("change", updateFiltersState);
+    document.getElementById("genotype").addEventListener("change", updateFiltersState);
+    document.getElementById("diet").addEventListener("change", updateFiltersState);
+});
+</script>
+
+<script>
+document.addEventListener("DOMContentLoaded", () => {
+    initExpressionChart();
+});
+</script>
+
+<script>
+document.getElementById("geneSearchForm").addEventListener("submit", function(event) {
+    event.preventDefault();
+    
+    const geneInput = document.getElementById("gene");
+    const gene = geneInput.value.trim();
+    
+    if (!gene) {
+        document.getElementById("resultsArea").innerHTML = `
+            <p class="error-message">Please enter a gene symbol before running the lookup.</p>
+        `;
+        geneInput.focus();
+        return;
+    }
+
+    const form = event.target;
+    const formData = new FormData(form);
+
+    formData.set("ajax", "1");
+
+    const queryString = new URLSearchParams(formData).toString();
+
+    document.getElementById("loadingMessage").style.display = "block";
+    document.getElementById("resultsArea").style.opacity = 0.5;
+
+    fetch(`${form.action}?${queryString}`)
+        .then(response => response.text())
+        .then(html => {
+            document.getElementById("resultsArea").innerHTML = html;
+
+            initExpressionChart();
+
+            const cleanUrl = `${form.action}?${queryString.replace("&ajax=1", "")}`;
+            window.history.pushState({}, "", cleanUrl);
+            localStorage.setItem("lastUrl_gene_lookup", window.location.pathname + window.location.search);
+        })
+        .catch(error => {
+            console.error("AJAX error:", error);
+            alert("Something went wrong while loading results.");
+        })
+        .finally(() => {
+            document.getElementById("loadingMessage").style.display = "none";
+            document.getElementById("resultsArea").style.opacity = 1;
+        });
+});
+</script>
+
+<script>
+document.getElementById("resetGeneSearch").addEventListener("click", function() {
+    const form = document.getElementById("geneSearchForm");
+
+    form.reset();
+
+    document.getElementById("gene").value = "";
+    document.getElementById("contrast").value = "None";
+    document.getElementById("genotype").value = "All";
+    document.getElementById("diet").value = "All";
+
+    updateFiltersState();
+
+    document.getElementById("resultsArea").innerHTML = "";
+
+    window.history.pushState({}, "", "{{ url_for('gene_lookup') }}");
+    localStorage.removeItem("lastUrl_gene_lookup");
+});
+</script>
+
+</body>
+</html>

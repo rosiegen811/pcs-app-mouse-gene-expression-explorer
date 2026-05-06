@@ -1,0 +1,316 @@
+<section>
+<h2>Top Differential Expression Results (FDR = selected cutoff)</h2>
+
+<div style="margin-bottom: 10px;">
+    <button onclick="downloadDEResults('csv')">Download CSV</button>
+    <button onclick="downloadDEResults('tsv')">Download TSV</button>
+</div>
+
+<div id="differentialResultsTable">
+<table>
+    <tr>
+        <th>Gene</th>
+        <th>Age</th>
+        <th>Tissue</th>
+        <th>Diet / Comparison</th>
+        <th>log2 Fold Change</th>
+        <th>FDR</th>
+        <th>Mean Expression (Group 1)</th>
+        <th>Mean Expression (Group 2)</th>
+        <th>External Links</th>
+    </tr>
+
+    {% for row in de_results %}
+    <tr>
+        <td>
+            <a href="{{ url_for('gene_lookup') }}?gene={{ row.gene_name }}" style="color: #3498db;">
+                {{ row.gene_name }}
+            </a>
+        </td>
+        <td>{{ row.age }} months</td>
+        <td>{{ row.tissue }}</td>
+        <td>{{ row.comparison }}</td>
+        <td>{{ "%.2f"|format(row.log2_fold_change) }}</td>
+        <td>{{ "%.3g"|format(row.padj) }}</td>
+        <td>
+            {% if row.mean_group1 is not none %}
+                {{ "%.2f"|format(row.mean_group1) }}
+            {% else %}
+                N/A
+            {% endif %}
+        </td>
+        <td>
+            {% if row.mean_group2 is not none %}
+                {{ "%.2f"|format(row.mean_group2) }}
+            {% else %}
+                N/A
+            {% endif %}
+        </td>
+        
+        <td class="links">
+            <!-- old links
+            <a href="https://search.brain-map.org/search/index.html?query={{ row.gene_name.lower() }}">Allen Brain Atlas</a>
+            <a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ row.gene_name }}">NCBI</a>
+            <a href="https://pubmed.ncbi.nlm.nih.gov/?term={{ row.gene_name.lower() }}&sort=date">PubMed</a>
+            <a href="https://scholar.google.com/scholar?q={{ row.gene_name.lower() }}">Google Scholar</a>
+            -->
+            
+            <a href="https://www.ensembl.org/Mus_musculus/Gene/Summary?g={{ row.gene_name[0].upper() + row.gene_name[1:].lower() }}"
+               target="_blank"
+               rel="noopener noreferrer">
+               Ensembl
+            </a>
+            
+            <a href="https://search.brain-map.org/search/index.html?query={{ row.gene_name.lower() }}" target="_blank" rel="noopener noreferrer">Allen Brain Atlas</a>
+            <a href="https://www.ncbi.nlm.nih.gov/gene/?term={{ row.gene_name }}" target="_blank" rel="noopener noreferrer">NCBI</a>
+            <a href="https://pubmed.ncbi.nlm.nih.gov/?term={{ row.gene_name.lower() }}&sort=date" target="_blank" rel="noopener noreferrer">PubMed</a>
+            <a href="https://scholar.google.com/scholar?q={{ row.gene_name.lower() }}" target="_blank" rel="noopener noreferrer">Google Scholar</a>
+            <a href="https://www.uniprot.org/uniprotkb?query={{ row.gene_name }}" target="_blank" rel="noopener noreferrer">UniProt</a>
+            <a href="https://www.omim.org/search?search={{ row.gene_name.lower() }}"
+               target="_blank"
+               rel="noopener noreferrer">
+               OMIM
+            </a>
+        </td>
+    </tr>
+    {% else %}
+    <tr>
+        <td colspan="9">No differential expression results found.</td>
+    </tr>
+    {% endfor %}
+</table>
+</div>
+
+<script>
+function downloadDEResults(format) {
+    const tableDiv = document.getElementById('differentialResultsTable');
+    const table = tableDiv.querySelector('table');
+    const rows = Array.from(table.rows);
+
+    let content = '';
+    const separator = format === 'csv' ? ',' : '\t';
+    const extension = format;
+
+    const headers = Array.from(rows[0].cells).slice(0, -1).map(cell => cell.textContent.trim());
+    content += headers.join(separator) + '\n';
+
+    for (let i = 1; i < rows.length; i++) {
+        const cells = Array.from(rows[i].cells).slice(0, -1);
+        const rowData = cells.map(cell => {
+            let text = cell.textContent.trim();
+
+            if (format === 'csv' && (text.includes(',') || text.includes('"') || text.includes('\n'))) {
+                text = '"' + text.replace(/"/g, '""') + '"';
+            }
+
+            return text;
+        });
+
+        content += rowData.join(separator) + '\n';
+    }
+
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = window.URL.createObjectURL(blob);
+
+    const a = document.createElement('a');
+    a.href = url;
+    
+    const contrast = document.querySelector('select[name="contrast"]').value;
+    const tissue = document.querySelector('select[name="tissue"]').value;
+    const age = document.querySelector('select[name="age"]').value;
+    
+    function cleanName(text) {
+        return text
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, "_")
+            .replace(/^_+|_+$/g, "");
+    }
+    
+    a.download = `${cleanName(contrast)}_${cleanName(tissue)}_${age}mo_differential_expression_results.${extension}`;
+
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+
+    window.URL.revokeObjectURL(url);
+}
+</script>
+
+<section>
+<h2>Volcano Plot</h2>
+
+<p class="plot-subtitle">
+log<sub>2</sub> fold change vs -log<sub>10</sub>(FDR)
+</p>
+
+{% if not volcano_results %}
+<p class="note">
+No genes match your search criteria.
+</p>
+
+{% elif not de_results %}
+<p class="note">
+Genes match your search, but none pass the selected FDR cutoff. All matching genes are shown in the volcano plot for context.
+</p>
+{% endif %}
+
+{% if volcano_results %}
+<button type="button" onclick="downloadVolcanoPNG()" style="margin-bottom: 12px;">
+    Download Volcano Plot PNG
+</button>
+
+<div style="height:350px;">
+    <canvas id="volcanoPlot"></canvas>
+</div>
+{% endif %}
+
+<p class="note">
+Rows with adjusted p-value reported as 0 are plotted at the smallest nonzero FDR for this query. Edge points are capped for readability. Hover to see original values.
+</p>
+
+</section>
+
+<script>
+(function () {
+    var deResults = {{ volcano_results | tojson }};
+    
+    const xDisplayCap = 5;
+    const yDisplayCap = 10;
+    
+    const volcanoData = deResults
+        .filter(row => row.log2_fold_change !== null && row.volcano_padj !== null)
+        .map(row => {
+            const rawX = Number(row.log2_fold_change);
+            const rawY = -Math.log10(Number(row.volcano_padj));
+            
+            return {
+                x: Math.max(Math.min(rawX, xDisplayCap), -xDisplayCap),
+                y: Math.min(rawY, yDisplayCap),
+                rawX: rawX,
+                rawY: rawY,
+                gene: row.gene_name
+            };
+    });
+    
+    const fdrCutoff = Number("{{ request.args.get('fdr', '0.05') }}");
+    const log2fcCutoff = 0.5;
+    
+    const upregulated = [];
+    const downregulated = [];
+    const nonsignificant = [];
+    
+    volcanoData.forEach(point => {
+        const isSig = point.rawY >= -Math.log10(fdrCutoff);
+        const isUp = point.rawX >= log2fcCutoff;
+        const isDown = point.rawX <= -log2fcCutoff;
+    
+        if (isSig && isUp) {
+            upregulated.push(point);
+        } else if (isSig && isDown) {
+            downregulated.push(point);
+        } else {
+            nonsignificant.push(point);
+        }
+    });
+    
+    var volcanoCtx = document.getElementById("volcanoPlot");
+    if (window.volcanoChart) {
+        window.volcanoChart.destroy();
+    }
+    
+    window.volcanoChart = null;
+    
+    if (volcanoCtx && volcanoData.length > 0) {
+        window.volcanoChart = new Chart(volcanoCtx, {
+            type: "scatter",
+            data: {
+                datasets: [
+                    {
+                        label: "Not significant",
+                        data: nonsignificant,
+                        pointRadius: 2,
+                        backgroundColor: "rgba(160,160,160,0.15)"
+                    },
+                    {
+                        label: "Upregulated",
+                        data: upregulated,
+                        pointRadius: 5,
+                        backgroundColor: "rgba(220,53,69,0.8)"
+                    },
+                    {
+                        label: "Downregulated",
+                        data: downregulated,
+                        pointRadius: 5,
+                        backgroundColor: "rgba(0,123,255,0.8)"
+                    }
+                ]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                parsing: false,
+                plugins: {
+                    title: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                const point = context.raw;
+                                return `${point.gene}: log2FC=${point.rawX.toFixed(2)}, -log10(FDR)=${point.rawY.toFixed(2)}`;
+                            }
+                        }
+                    },
+                    annotation: {
+                        annotations: {
+                            fdrLine: {
+                                type: "line",
+                                yMin: -Math.log10(fdrCutoff),
+                                yMax: -Math.log10(fdrCutoff),
+                                borderColor: "black",
+                                borderDash: [6,6],
+                                borderWidth: 1
+                            },
+                            fcLeft: {
+                                type: "line",
+                                xMin: -log2fcCutoff,
+                                xMax: -log2fcCutoff,
+                                borderColor: "black",
+                                borderDash: [6,6],
+                                borderWidth: 1
+                            },
+                            fcRight: {
+                                type: "line",
+                                xMin: log2fcCutoff,
+                                xMax: log2fcCutoff,
+                                borderColor: "black",
+                                borderDash: [6,6],
+                                borderWidth: 1
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: {
+                        min: -3,
+                        max: 3,
+                        title: { display: true, text: "log2 Fold Change" }
+                    },
+                    y: {
+                        beginAtZero: true,
+                        max: 10,
+                        title: { display: true, text: "-log10(FDR)" }
+                    }
+                }
+            }
+        });
+    }
+    
+    window.downloadVolcanoPNG = function () {
+        if (!window.volcanoChart) return;
+    
+        const link = document.createElement("a");
+        link.href = window.volcanoChart.toBase64Image("image/png", 1);
+        link.download = "volcano_plot.png";
+        link.click();
+    };
+})();
+</script>

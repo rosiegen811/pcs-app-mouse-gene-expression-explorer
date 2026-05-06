@@ -1,0 +1,122 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>{{ title }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body data-page="help">
+{% include "_navbar.html" %}
+
+<header>
+<h1>📚 Help & User Guide</h1>
+</header>
+
+<section>
+<h2>Welcome to the PCS-APP Mouse Gene Expression Explorer</h2>
+<p>This database contains RNA-sequencing data from a study investigating the effects of perinatal choline supplementation 
+on gene expression in App NL-G-F Alzheimer's disease mouse model.</p>
+
+<h3>🎯 Study Design</h3>
+<ul>
+    <li><strong>Genotypes:</strong> APP transgenic mice vs Wild-type (WT) controls</li>
+    <li><strong>Diet:</strong> Control diet vs Choline-supplemented diet</li>
+    <li><strong>Sex:</strong> Male and Female</li>
+    <li><strong>Ages:</strong> 3, 6, 9, and 12 months</li>
+    <li><strong>Brain Regions:</strong> Cortex and Hippocampus</li>
+</ul>
+</section>
+
+<section>
+<h2>🔧 How to Use Gene Search Page</h2>
+<ol>
+    <li>Click <strong>"Gene Expression Lookup"</strong> from the dashboard</li>
+    <li>Enter a gene name (e.g., Bdnf, Apoe, Mapt)</li>
+    <li>Choose filters (tissue, age, genotype, sex, diet) or leave as "All"</li>
+    <li>Click <strong>"Run Gene Lookup"</strong></li>
+    <li>View expression results table with normalized counts</li>
+</ol>
+
+<p class="note">
+<strong>Popular genes to try:</strong> Bdnf, Grn, Itgax, Apoe, Mapt
+</p>
+</section>
+
+<section>
+<h2>📊 How to Use Differential Expression Analysis Page</h2>
+<ol>
+    <li>Click <strong>"Differential Expression Results"</strong> from the dashboard</li>
+    <li>Select filters to define your comparison:
+        <ul>
+            <li><strong>Tissue</strong>, <strong>Age</strong>, and other variables</li>
+            <li><strong>Contrast</strong> (e.g., APP vs WT)</li>
+            <li><strong>Direction</strong> (upregulated, downregulated, or both)</li>
+        </ul>
+    </li>
+    <li>Optionally adjust the <strong>FDR cutoff</strong> to control statistical significance</li>
+    <li>Click <strong>"Run Query"</strong> to generate results</li>
+    <li>Explore the output:
+        <ul>
+            <li><strong>Ranked results table</strong> of differentially expressed genes</li>
+            <li><strong>Key metrics:</strong> log2 fold change and FDR</li>
+            <li><strong>Volcano plot</strong> to visualize significant genes</li>
+        </ul>
+    </li>
+</ol>
+
+<p class="note">
+<strong>Tip:</strong> Start with broader filters and a standard FDR cutoff (0.05), then refine to focus on the most significant genes. 
+Use the volcano plot to quickly identify strongly up- or down-regulated genes.
+</p>
+</section>
+
+<section>
+<h2>💡 Tips & Best Practices</h2>
+<ul>
+    <li><strong>Gene Names:</strong> Use mouse gene symbols (e.g., Bdnf not BDNF)</li>
+    <li><strong>Filters:</strong> Start broad (All) then narrow down to specific conditions</li>
+    <li><strong>No Results?</strong> Check spelling or try related gene names</li>
+    <li><strong>Expression Values:</strong> Normalized RNA-seq counts (higher = more expression)</li>
+</ul>
+</section>
+
+<section>
+<h2>📚 About This Project</h2>
+
+<p>
+<strong>Course:</strong> BF768 - Biological Data Analysis<br>
+<strong>Institution:</strong> Boston University<br>
+<strong>Instructor:</strong> G. Benson<br>
+<strong>Faculty Supervisors:</strong> Dr. Jan K. Blusztajn, Andre Krunic<br>
+<strong>Affiliation:</strong> Department of Pathology and Laboratory Medicine, Boston University Chobanian & Avedisian School of Medicine<br>
+<strong>Team 10:</strong> Selvakumar, Swathy • Genel, Rosalynn • Castro, Alan Alfonso
+</p>
+
+<p class="note">
+This database interface was developed as part of the BF768 final project, demonstrating 
+relational database design, SQL querying, and web application development for biological data analysis.
+</p>
+
+<p class="note">
+    <strong>Data Source:</strong>
+    Bellio TA et al. (2025).
+    <em>Perinatal Choline Supplementation Promotes Resilience Against Progression of Alzheimer's Disease-Like Brain Transcriptomic Signatures in App NL-G-F Mice.</em>
+    Aging Cell, 24(11): e70148.
+    <a href="https://doi.org/10.1111/acel.70148"
+       target="_blank"
+       rel="noopener noreferrer">
+       https://doi.org/10.1111/acel.70148
+    </a>
+</p>
+
+<p>
+    <a class="download-button"
+       href="{{ url_for('static', filename='Bellio_2025_Aging_Cell.pdf') }}"
+       download>
+       Download Article PDF
+    </a>
+</p>
+
+</section>
+
+</body>
+</html>

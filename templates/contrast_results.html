@@ -1,0 +1,178 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>{{ title | default('Differential Expression Results') }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation"></script>
+</head>
+<body data-page="contrast_results">
+{% include "_navbar.html" %}
+
+<header>
+<h1>⚖️ Differential Expression Results</h1>
+</header>
+
+<section>
+<h2>Differential Analysis Summary</h2>
+<div class="summary">
+    <div class="summary-box">
+        <h3>Total Contrasts</h3>
+        <p>{{ stats.total_contrasts | default('48') }}</p>
+    </div>
+    <div class="summary-box">
+        <h3>Significant Genes (FDR < 0.05)</h3>
+        <p>{{ stats.significant_genes | default('2,847') }}</p>
+    </div>
+    <div class="summary-box">
+        <h3>Highly Significant (FDR < 0.001)</h3>
+        <p>{{ stats.highly_significant | default('892') }}</p>
+    </div>
+</div>
+</section>
+
+<section>
+<h2>Query Dataset</h2>
+
+<form id="contrastForm" method="GET" action="{{ url_for('contrast_results') }}">
+
+<div class="filter-grid">
+    <div>
+        <label>Tissue</label>
+        <select name="tissue">
+            <option value="All">All tissues</option>
+            <option value="Cortex">Cortex</option>
+            <option value="Hippocampus">Hippocampus</option>
+        </select>
+    </div>
+
+    <div>
+        <label>Age</label>
+        <select name="age">
+            <option value="All">All ages</option>
+            <option value="3">3 months</option>
+            <option value="6">6 months</option>
+            <option value="9">9 months</option>
+            <option value="12">12 months</option>
+        </select>
+    </div>
+    
+    <div>
+        <label>Contrast</label>
+        <select name="contrast">
+            <option>APP vs WT</option>
+            <option>APP Supplemented vs APP Control</option>
+            <option>WT Supplemented vs WT Control</option>
+        </select>
+    </div>
+
+    <div>
+        <label>Direction</label>
+        <select name="direction">
+            <option>Both</option>
+            <option>Upregulated</option>
+            <option>Downregulated</option>
+        </select>
+    </div>
+</div>
+
+<div class="filter-grid">
+    <div>
+        <label>FDR cutoff</label>
+        <input type="number" name="fdr" value="0.05" step="0.01">
+    </div>
+
+    <div style="grid-column: span 3;">
+        <label>Gene Search</label>
+        <input type="text" name="gene_name"
+               placeholder="Example: BDNF, APOE, TREM2">
+    </div>
+</div>
+
+<div class="button-row">
+    <button type="submit">Run Query</button>
+
+    <button type="button" class="secondary" id="resetContrastForm">
+        Reset
+    </button>  
+</div>
+
+<p class="note">
+This results table shows differential expression output filtered by gene, tissue, age, contrast, direction, and FDR cutoff. The links on the gene name open the gene lookup page. Use download buttons above to export results.
+</p>
+
+</form>
+
+</section>
+
+<div id="loadingMessage" style="display:none; margin-top:15px;">
+    <p class="note"><span class="spinner"></span>Loading differential expression results...</p>
+</div>
+
+<!-- RESULTS OUTPUT -->
+<div id="contrastResultsContainer">
+    {% if request.args %}
+        {% include "contrast_results_partial.html" %}
+    {% endif %}
+</div>
+
+<script>
+const contrastForm = document.getElementById("contrastForm");
+const resultsContainer = document.getElementById("contrastResultsContainer");
+
+contrastForm.addEventListener("submit", function(event) {
+    event.preventDefault();
+
+    const formData = new FormData(contrastForm);
+    formData.set("ajax", "1");
+
+    const params = new URLSearchParams(formData);
+    const url = contrastForm.action + "?" + params.toString();
+
+    document.getElementById("loadingMessage").style.display = "block";
+    resultsContainer.style.opacity = 0.5;
+
+    fetch(url)
+        .then(response => response.text())
+        .then(html => {
+            resultsContainer.innerHTML = html;
+            
+            resultsContainer.querySelectorAll("script").forEach(oldScript => {
+                const newScript = document.createElement("script");
+                newScript.textContent = oldScript.textContent;
+                document.body.appendChild(newScript);
+                document.body.removeChild(newScript);
+            });
+
+            formData.delete("ajax");
+            const cleanParams = new URLSearchParams(formData);
+            window.history.pushState({}, "", contrastForm.action + "?" + cleanParams.toString());
+            localStorage.setItem("lastUrl_contrast_results", window.location.pathname + window.location.search);
+        })
+        .catch(error => {
+            console.error(error);
+            resultsContainer.innerHTML = "<p class='note'>Error loading results.</p>";
+        })
+        .finally(() => {
+            document.getElementById("loadingMessage").style.display = "none";
+            resultsContainer.style.opacity = 1;
+        });
+});
+
+document.getElementById("resetContrastForm").addEventListener("click", function() {
+    contrastForm.reset();
+
+    // reset specific defaults if needed
+    contrastForm.querySelector('input[name="fdr"]').value = "0.05";
+
+    // 🧹 clear results completely
+    resultsContainer.innerHTML = "";
+
+    // 🧹 reset URL (no query params)
+    window.history.pushState({}, "", contrastForm.action);
+    localStorage.removeItem("lastUrl_contrast_results");
+});
+</script>
+
+</body>
+</html>
