@@ -256,6 +256,6 @@ Potential future extensions include:
 Developed as part of a bioinformatics/database systems project.
 
 Contributors:
-- Alan Alfonso 
+- Alan Castro 
 - Rosalynn Genel
 - Swathy Selvakumar
