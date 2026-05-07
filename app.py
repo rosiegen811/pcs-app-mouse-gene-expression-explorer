@@ -15,11 +15,11 @@ app = Flask(__name__)
 
 def get_connection():
     return mariadb.connect(
-        host="bioed-new.bu.edu",
+        host=os.getenv("DB_HOST", "localhost"),
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
-        database="Team10",
-        port = 4253)
+        database=os.gentenv("DB_NAME", "Team10"),
+        port=int(os.getenv("DB_PORT", 4253))
 
 @app.route('/')
 def home():
