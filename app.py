@@ -18,8 +18,9 @@ def get_connection():
         host=os.getenv("DB_HOST", "localhost"),
         user=os.getenv("DB_USER"),
         password=os.getenv("DB_PASSWORD"),
-        database=os.gentenv("DB_NAME", "Team10"),
+        database=os.getenv("DB_NAME", "Team10"),
         port=int(os.getenv("DB_PORT", 4253))
+    )
 
 @app.route('/')
 def home():
@@ -332,8 +333,8 @@ def gene_lookup():
 @app.route('/contrast_results')
 def contrast_results():
     try: 
-        tissue = request.args.get("tissue", "Cortex")
-        age = request.args.get("age", "3")
+        tissue = request.args.get("tissue", "All")
+        age = request.args.get("age", "All")
         contrast = request.args.get("contrast", "APP vs WT")
         direction = request.args.get("direction", "Both")
         fdr = request.args.get("fdr", "0.05")
@@ -567,7 +568,13 @@ def contrast_results():
             active_page="contrast_results",
             stats=stats,
             de_results=de_results,
-            volcano_results=volcano_results
+            volcano_results=volcano_results,
+            tissue=tissue,
+            age=age,
+            contrast=contrast,
+            direction=direction,
+            fdr=fdr,
+            gene_name=gene_name
         )
     
     except Exception:

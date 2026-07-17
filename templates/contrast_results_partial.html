@@ -221,6 +221,18 @@ Rows with adjusted p-value reported as 0 are plotted at the smallest nonzero FDR
     window.volcanoChart = null;
     
     if (volcanoCtx && volcanoData.length > 0) {
+        const whiteBackgroundPlugin = {
+            id: 'whiteBackgroundPlugin',
+            beforeDraw: function(chart) {
+                const ctx = chart.ctx;
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-over';
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, chart.width, chart.height);
+                ctx.restore();
+            }
+        };
+    
         window.volcanoChart = new Chart(volcanoCtx, {
             type: "scatter",
             data: {
@@ -300,17 +312,19 @@ Rows with adjusted p-value reported as 0 are plotted at the smallest nonzero FDR
                         title: { display: true, text: "-log10(FDR)" }
                     }
                 }
-            }
+            },
+            plugins: [whiteBackgroundPlugin]
         });
     }
     
     window.downloadVolcanoPNG = function () {
         if (!window.volcanoChart) return;
     
-        const link = document.createElement("a");
-        link.href = window.volcanoChart.toBase64Image("image/png", 1);
-        link.download = "volcano_plot.png";
+        const link = document.createElement('a');
+        link.download = 'volcano_plot.png';
+        link.href = window.volcanoChart.toBase64Image();
         link.click();
     };
+
 })();
 </script>

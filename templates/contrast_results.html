@@ -40,38 +40,52 @@
     <div>
         <label>Tissue</label>
         <select name="tissue">
-            <option value="All">All tissues</option>
-            <option value="Cortex">Cortex</option>
-            <option value="Hippocampus">Hippocampus</option>
+            <option value="All" {% if tissue == "All" %}selected{% endif %}>All tissues</option>
+            <option value="Cortex" {% if tissue == "Cortex" %}selected{% endif %}>Cortex</option>
+            <option value="Hippocampus" {% if tissue == "Hippocampus" %}selected{% endif %}>Hippocampus</option>
         </select>
     </div>
 
     <div>
         <label>Age</label>
         <select name="age">
-            <option value="All">All ages</option>
-            <option value="3">3 months</option>
-            <option value="6">6 months</option>
-            <option value="9">9 months</option>
-            <option value="12">12 months</option>
+            <option value="All" {% if age == "All" %}selected{% endif %}>All ages</option>
+            <option value="3" {% if age == "3" %}selected{% endif %}>3 months</option>
+            <option value="6" {% if age == "6" %}selected{% endif %}>6 months</option>
+            <option value="9" {% if age == "9" %}selected{% endif %}>9 months</option>
+            <option value="12" {% if age == "12" %}selected{% endif %}>12 months</option>
         </select>
     </div>
     
     <div>
         <label>Contrast</label>
         <select name="contrast">
-            <option>APP vs WT</option>
-            <option>APP Supplemented vs APP Control</option>
-            <option>WT Supplemented vs WT Control</option>
+            <option value="APP vs WT" {% if contrast == "APP vs WT" %}selected{% endif %}>
+                APP vs WT
+            </option>
+            <option value="APP Supplemented vs APP Control"
+                {% if contrast == "APP Supplemented vs APP Control" %}selected{% endif %}>
+                APP Supplemented vs APP Control
+            </option>
+            <option value="WT Supplemented vs WT Control"
+                {% if contrast == "WT Supplemented vs WT Control" %}selected{% endif %}>
+                WT Supplemented vs WT Control
+            </option>
         </select>
     </div>
 
     <div>
         <label>Direction</label>
         <select name="direction">
-            <option>Both</option>
-            <option>Upregulated</option>
-            <option>Downregulated</option>
+            <option value="Both" {% if direction == "Both" %}selected{% endif %}>
+                Both
+            </option>
+            <option value="Upregulated" {% if direction == "Upregulated" %}selected{% endif %}>
+                Upregulated
+            </option>
+            <option value="Downregulated" {% if direction == "Downregulated" %}selected{% endif %}>
+                Downregulated
+            </option>
         </select>
     </div>
 </div>
@@ -79,12 +93,14 @@
 <div class="filter-grid">
     <div>
         <label>FDR cutoff</label>
-        <input type="number" name="fdr" value="0.05" step="0.01">
+        <input type="number" name="fdr" value="{{ fdr }}" step="0.01">
     </div>
 
     <div style="grid-column: span 3;">
         <label>Gene Search</label>
-        <input type="text" name="gene_name"
+        <input type="text"
+               name="gene_name"
+               value="{{ gene_name }}"
                placeholder="Example: BDNF, APOE, TREM2">
     </div>
 </div>
@@ -120,6 +136,27 @@ This results table shows differential expression output filtered by gene, tissue
 const contrastForm = document.getElementById("contrastForm");
 const resultsContainer = document.getElementById("contrastResultsContainer");
 
+function applyUrlParamsToContrastForm() {
+    const params = new URLSearchParams(window.location.search);
+
+    const fields = ["tissue", "age", "contrast", "direction", "fdr", "gene_name"];
+
+    fields.forEach(name => {
+        const value = params.get(name);
+        const field = contrastForm.querySelector(`[name="${name}"]`);
+
+        if (field && value !== null) {
+            field.value = value;
+        }
+    });
+}
+
+applyUrlParamsToContrastForm();
+
+window.addEventListener("pageshow", function() {
+    applyUrlParamsToContrastForm();
+});
+
 contrastForm.addEventListener("submit", function(event) {
     event.preventDefault();
 
@@ -136,7 +173,7 @@ contrastForm.addEventListener("submit", function(event) {
         .then(response => response.text())
         .then(html => {
             resultsContainer.innerHTML = html;
-            
+
             resultsContainer.querySelectorAll("script").forEach(oldScript => {
                 const newScript = document.createElement("script");
                 newScript.textContent = oldScript.textContent;
@@ -146,7 +183,9 @@ contrastForm.addEventListener("submit", function(event) {
 
             formData.delete("ajax");
             const cleanParams = new URLSearchParams(formData);
-            window.history.pushState({}, "", contrastForm.action + "?" + cleanParams.toString());
+            const cleanUrl = contrastForm.action + "?" + cleanParams.toString();
+
+            window.history.pushState({}, "", cleanUrl);
             localStorage.setItem("lastUrl_contrast_results", window.location.pathname + window.location.search);
         })
         .catch(error => {
@@ -160,15 +199,15 @@ contrastForm.addEventListener("submit", function(event) {
 });
 
 document.getElementById("resetContrastForm").addEventListener("click", function() {
-    contrastForm.reset();
-
-    // reset specific defaults if needed
+    contrastForm.querySelector('select[name="tissue"]').value = "All";
+    contrastForm.querySelector('select[name="age"]').value = "All";
+    contrastForm.querySelector('select[name="contrast"]').value = "APP vs WT";
+    contrastForm.querySelector('select[name="direction"]').value = "Both";
     contrastForm.querySelector('input[name="fdr"]').value = "0.05";
+    contrastForm.querySelector('input[name="gene_name"]').value = "";
 
-    // 🧹 clear results completely
     resultsContainer.innerHTML = "";
 
-    // 🧹 reset URL (no query params)
     window.history.pushState({}, "", contrastForm.action);
     localStorage.removeItem("lastUrl_contrast_results");
 });

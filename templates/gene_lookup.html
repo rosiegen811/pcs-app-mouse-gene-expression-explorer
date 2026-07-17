@@ -113,6 +113,58 @@
 
 <script>
 let expressionChart;
+let customGraphChart;
+let customPanelCharts = [];
+
+// Error bar plugin
+const errorBarPlugin = {
+    id: "errorBars",
+
+    afterDatasetsDraw(chart) {
+        const { ctx, scales } = chart;
+        const yScale = scales.y;
+
+        ctx.save();
+        ctx.lineWidth = 2;
+        ctx.strokeStyle = "#555";
+
+        chart.data.datasets.forEach((dataset, datasetIndex) => {
+            if (!dataset.errorBars) return;
+
+            const meta = chart.getDatasetMeta(datasetIndex);
+
+            meta.data.forEach((point, index) => {
+                const error = dataset.errorBars[index];
+                const meanValue = dataset.data[index];
+
+                if (error == null || meanValue == null) return;
+
+                const x = point.x;
+                const yTop = yScale.getPixelForValue(meanValue + error);
+                const yBottom = yScale.getPixelForValue(meanValue - error);
+
+                ctx.beginPath();
+                ctx.moveTo(x, yTop);
+                ctx.lineTo(x, yBottom);
+
+                // top cap
+                ctx.moveTo(x - 6, yTop);
+                ctx.lineTo(x + 6, yTop);
+
+                // bottom cap
+                ctx.moveTo(x - 6, yBottom);
+                ctx.lineTo(x + 6, yBottom);
+
+                ctx.stroke();
+            });
+        });
+
+        ctx.restore();
+    }
+};
+
+// Register it once
+Chart.register(errorBarPlugin);
 
 function initExpressionChart() {
     const sampleRowsEl = document.getElementById("sampleRowsData");
@@ -225,6 +277,464 @@ function initExpressionChart() {
             }
         });
     }
+}
+
+function getCustomGroupValue(row, groupBy) {
+    if (groupBy === "Sex") {
+        return row.sex;
+    }
+
+    if (groupBy === "Diet") {
+        return row.diet;
+    }
+
+    if (groupBy === "GenotypeDiet") {
+        return `${row.genotype} ${row.diet}`;
+    }
+
+    if (groupBy === "GenotypePanelsDietLines") {
+        return row.diet;   // lines = diet
+    }
+
+    if (groupBy === "DietPanelsGenotypeLines") {
+        return row.genotype;   // lines = genotype
+    }
+
+    return row.genotype;
+}
+
+function getCustomPanelValue(row, groupBy) {
+    if (groupBy === "GenotypePanelsDietLines") {
+        return row.genotype;   // panels = APP / WT
+    }
+
+    if (groupBy === "DietPanelsGenotypeLines") {
+        return row.diet;   // panels = Control / Supplemented
+    }
+
+    return null;
+}
+
+const customGroupColors = [
+    "rgba(54, 162, 235, 0.35)",
+    "rgba(255, 99, 132, 0.35)",
+    "rgba(75, 192, 192, 0.35)",
+    "rgba(255, 159, 64, 0.35)",
+    "rgba(153, 102, 255, 0.35)",
+    "rgba(255, 205, 86, 0.35)"
+];
+
+const customGroupBorders = [
+    "rgba(54, 162, 235, 1)",
+    "rgba(255, 99, 132, 1)",
+    "rgba(75, 192, 192, 1)",
+    "rgba(255, 159, 64, 1)",
+    "rgba(153, 102, 255, 1)",
+    "rgba(255, 205, 86, 1)"
+];
+
+// ----- Statistics Helpers -----
+
+function getMean(values) {
+    if (!values.length) return null;
+
+    return values.reduce((sum, value) => sum + value, 0) / values.length;
+}
+
+function getStandardDeviation(values) {
+    if (values.length <= 1) return 0;
+
+    const avg = getMean(values);
+
+    const variance = values.reduce((sum, value) => {
+        return sum + Math.pow(value - avg, 2);
+    }, 0) / (values.length - 1);
+
+    return Math.sqrt(variance);
+}
+
+function getStandardError(values) {
+    if (!values.length) return null;
+
+    return getStandardDeviation(values) / Math.sqrt(values.length);
+}
+
+// ----- END Statistics Helpers -----
+
+function updateCustomGroupOptions() {
+    const plotType = document.getElementById("customPlotType").value;
+    const groupSelect = document.getElementById("customGroupBy");
+
+    const panelOptions = [
+        "GenotypePanelsDietLines",
+        "DietPanelsGenotypeLines"
+    ];
+
+    [...groupSelect.options].forEach(option => {
+        option.disabled = plotType === "boxplot" && panelOptions.includes(option.value);
+    });
+
+    if (plotType === "boxplot" && panelOptions.includes(groupSelect.value)) {
+        groupSelect.value = "Genotype";
+    }
+}
+
+function clearCustomCharts() {
+    if (customGraphChart) {
+        customGraphChart.destroy();
+        customGraphChart = null;
+    }
+
+    customPanelCharts.forEach(chart => chart.destroy());
+    customPanelCharts = [];
+}
+
+function initCustomGraphChart() {
+    const sampleRowsEl = document.getElementById("sampleRowsData");
+    const geneNameEl = document.getElementById("geneNameData");
+    const chartContainer = document.getElementById("customGraphContainer");
+    
+    if (!sampleRowsEl || !geneNameEl || !chartContainer) {
+        return;
+    }
+
+    const sampleRows = JSON.parse(sampleRowsEl.textContent);
+    const geneName = JSON.parse(geneNameEl.textContent);
+
+    if (!sampleRows || sampleRows.length === 0) {
+        return;
+    }
+
+    const plotType = document.getElementById("customPlotType").value;
+    const groupBy = document.getElementById("customGroupBy").value;
+    
+    clearCustomCharts();
+
+    chartContainer.innerHTML = `
+        <div id="customGraphMessage"></div>
+        <canvas id="customGraphChart"></canvas>
+    `;
+    
+    const graphMessage = document.getElementById("customGraphMessage");
+
+    const ages = [...new Set(sampleRows.map(row => Number(row.age)))]
+        .filter(age => !isNaN(age))
+        .sort((a, b) => a - b);
+    
+    const singleAgeOnly = ages.length <= 1;
+
+    if (plotType === "mean_line" && singleAgeOnly) {
+        graphMessage.innerHTML = `
+            <p class="note">
+                Only one age group is available for the current filters, so the mean across ages plot contains a single point.
+            </p>
+        `;
+    } else {
+        graphMessage.innerHTML = "";
+    }
+
+    const groups = [...new Set(sampleRows.map(row => getCustomGroupValue(row, groupBy)))]
+        .filter(group => group !== null && group !== undefined && group !== "")
+        .sort();
+        
+    const panelValues = [...new Set(sampleRows.map(row => getCustomPanelValue(row, groupBy)))]
+        .filter(panel => panel !== null && panel !== undefined && panel !== "")
+        .sort();
+    
+    const isPanelMode = plotType === "mean_line" && panelValues.length > 0;
+    
+    if (isPanelMode) {
+        chartContainer.innerHTML = `
+            ${graphMessage.outerHTML}
+        `;
+    
+        const panelWrapper = document.createElement("div");
+        panelWrapper.style.display = "grid";
+        panelWrapper.style.gridTemplateColumns = "repeat(auto-fit, minmax(350px, 1fr))";
+        panelWrapper.style.gap = "20px";
+    
+        chartContainer.appendChild(panelWrapper);
+        
+        // Find the full plotted range across both panels using mean +/- SE
+        let sharedYMin = Infinity;
+        let sharedYMax = -Infinity;
+        
+        panelValues.forEach(panel => {
+            groups.forEach(group => {
+                ages.forEach(age => {
+                    const values = sampleRows
+                        .filter(row =>
+                            Number(row.age) === age &&
+                            getCustomPanelValue(row, groupBy) === panel &&
+                            getCustomGroupValue(row, groupBy) === group
+                        )
+                        .map(row => Number(row.expression))
+                        .filter(value => !isNaN(value));
+        
+                    if (values.length === 0) {
+                        return;
+                    }
+        
+                    const mean = getMean(values);
+                    const standardError = getStandardError(values) ?? 0;
+        
+                    sharedYMin = Math.min(
+                        sharedYMin,
+                        mean - standardError
+                    );
+        
+                    sharedYMax = Math.max(
+                        sharedYMax,
+                        mean + standardError
+                    );
+                });
+            });
+        });
+        
+        // Add a small amount of space above and below the plotted range
+        const sharedYRange = sharedYMax - sharedYMin;
+        
+        const yPadding = sharedYRange === 0
+            ? Math.max(Math.abs(sharedYMax) * 0.05, 1)
+            : sharedYRange * 0.05;
+        
+        const sharedYScale = {
+            min: Math.max(0, sharedYMin - yPadding),
+            max: sharedYMax + yPadding
+        };
+        
+        panelValues.forEach(panel => {
+            const panelDiv = document.createElement("div");
+            panelDiv.style.border = "1px solid #ddd";
+            panelDiv.style.borderRadius = "8px";
+            panelDiv.style.padding = "12px";
+    
+            const panelTitle = document.createElement("h3");
+            panelTitle.textContent = panel;
+            panelTitle.style.textAlign = "center";
+            panelTitle.style.marginTop = "0";
+    
+            const canvas = document.createElement("canvas");
+    
+            panelDiv.appendChild(panelTitle);
+            panelDiv.appendChild(canvas);
+            panelWrapper.appendChild(panelDiv);
+    
+            const panelDatasets = [];
+    
+            groups.forEach(group => {
+                const meanData = [];
+                const errorBars = [];
+    
+                ages.forEach(age => {
+                    const values = sampleRows
+                        .filter(row =>
+                            Number(row.age) === age &&
+                            getCustomPanelValue(row, groupBy) === panel &&
+                            getCustomGroupValue(row, groupBy) === group
+                        )
+                        .map(row => Number(row.expression))
+                        .filter(value => !isNaN(value));
+    
+                    meanData.push(getMean(values));
+                    errorBars.push(getStandardError(values));
+                });
+    
+                panelDatasets.push({
+                    type: "line",
+                    label: group,
+                    data: meanData,
+                    errorBars: errorBars,
+                    tension: 0.2,
+                    pointRadius: 5
+                });
+            });
+    
+            const panelChart = new Chart(canvas, {
+                data: {
+                    labels: ages.map(age => `${age} months`),
+                    datasets: panelDatasets
+                },
+                options: {
+                    responsive: true,
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: `${geneName} expression across age`
+                        }
+                    },
+                    scales: {
+                        x: {
+                            title: {
+                                display: true,
+                                text: "Age"
+                            }
+                        },
+                        y: {
+                            beginAtZero: false,
+                            min: sharedYScale.min,
+                            max: sharedYScale.max,
+                            title: {
+                                display: true,
+                                text: "Normalised Expression"
+                            }
+                        }
+                    }
+                }
+            });
+    
+            customPanelCharts.push(panelChart);
+        });
+    
+        return;
+    }
+
+    const datasets = [];
+
+    if (plotType === "boxplot") {
+        groups.forEach((group, groupIndex) => {
+            const boxData = ages.map(age => {
+                return sampleRows
+                    .filter(row => Number(row.age) === age && getCustomGroupValue(row, groupBy) === group)
+                    .map(row => Number(row.expression))
+                    .filter(value => !isNaN(value));
+            });
+
+            datasets.push({
+                type: "boxplot",
+                label: group,
+                data: boxData,
+                backgroundColor: customGroupColors[groupIndex % customGroupColors.length],
+                borderColor: customGroupBorders[groupIndex % customGroupBorders.length],
+                borderWidth: 1
+            });
+        });
+
+        const pointData = [];
+
+        sampleRows.forEach((row, index) => {
+            const ageIndex = ages.indexOf(Number(row.age));
+            const value = Number(row.expression);
+
+            if (ageIndex !== -1 && !isNaN(value)) {
+                const jitter = ((index % 7) - 3) * 0.03;
+
+                pointData.push({
+                    x: ageIndex + jitter,
+                    y: value
+                });
+            }
+        });
+
+        datasets.push({
+            type: "scatter",
+            label: "Individual samples",
+            data: pointData,
+            pointRadius: 4,
+            backgroundColor: "rgba(0, 0, 0, 0.65)",
+            xAxisID: "xScatter"
+        });
+    }
+
+    if (plotType === "mean_line") {
+        groups.forEach(group => {
+            const meanData = [];
+            const errorBars = [];
+    
+            ages.forEach(age => {
+                const values = sampleRows
+                    .filter(row =>
+                        Number(row.age) === age &&
+                        getCustomGroupValue(row, groupBy) === group
+                    )
+                    .map(row => Number(row.expression))
+                    .filter(value => !isNaN(value));
+    
+                meanData.push(getMean(values));
+                errorBars.push(getStandardError(values));
+            });
+    
+            datasets.push({
+                type: "line",
+                label: group,
+                data: meanData,
+                errorBars: errorBars,
+                tension: 0.2,
+                pointRadius: 5
+            });
+        });
+    }
+
+    if (customGraphChart) {
+        customGraphChart.destroy();
+    }
+
+    const chartCanvas = document.getElementById("customGraphChart");
+
+    customGraphChart = new Chart(chartCanvas, {
+        data: {
+            labels: ages.map(age => `${age} months`),
+            datasets: datasets
+        },
+        options: {
+            responsive: true,
+            plugins: {
+                title: {
+                    display: true,
+                    text: `${geneName} expression across age grouped by ${groupBy}`
+                }
+            },
+            scales: {
+                x: {
+                    title: {
+                        display: true,
+                        text: "Age"
+                    }
+                },
+                xScatter: {
+                    type: "linear",
+                    position: "bottom",
+                    min: -0.5,
+                    max: ages.length - 0.5,
+                    display: false
+                },
+                y: {
+                    beginAtZero: false,
+                    title: {
+                        display: true,
+                        text: "Normalised Expression"
+                    }
+                }
+            }
+        }
+    });
+}
+
+function downloadCustomPlot() {
+    const geneNameEl = document.getElementById("geneNameData");
+    const geneName = geneNameEl ? JSON.parse(geneNameEl.textContent) : "gene";
+
+    if (!customGraphChart) {
+        alert("No custom plot available to download.");
+        return;
+    }
+
+    const canvas = customGraphChart.canvas;
+
+    const tempCanvas = document.createElement("canvas");
+    tempCanvas.width = canvas.width;
+    tempCanvas.height = canvas.height;
+
+    const tempCtx = tempCanvas.getContext("2d");
+
+    tempCtx.fillStyle = "#ffffff";
+    tempCtx.fillRect(0, 0, tempCanvas.width, tempCanvas.height);
+    tempCtx.drawImage(canvas, 0, 0);
+
+    const link = document.createElement("a");
+    link.href = tempCanvas.toDataURL("image/png");
+    link.download = `${geneName}_custom_expression_plot.png`;
+    link.click();
 }
 
 function downloadDEResults(format) {
@@ -389,7 +899,13 @@ document.addEventListener("DOMContentLoaded", () => {
 
 <script>
 document.addEventListener("DOMContentLoaded", () => {
+    updateCustomGroupOptions();
     initExpressionChart();
+    initCustomGraphChart();
+
+    document.getElementById("customPlotType")?.addEventListener("change", () => {
+        updateCustomGroupOptions();
+    });
 });
 </script>
 
@@ -424,6 +940,7 @@ document.getElementById("geneSearchForm").addEventListener("submit", function(ev
             document.getElementById("resultsArea").innerHTML = html;
 
             initExpressionChart();
+            initCustomGraphChart();
 
             const cleanUrl = `${form.action}?${queryString.replace("&ajax=1", "")}`;
             window.history.pushState({}, "", cleanUrl);
@@ -442,14 +959,13 @@ document.getElementById("geneSearchForm").addEventListener("submit", function(ev
 
 <script>
 document.getElementById("resetGeneSearch").addEventListener("click", function() {
-    const form = document.getElementById("geneSearchForm");
-
-    form.reset();
-
     document.getElementById("gene").value = "";
-    document.getElementById("contrast").value = "None";
+    document.getElementById("tissue").value = "All";
+    document.getElementById("age").value = "All";
+    document.getElementById("sex").value = "All";
     document.getElementById("genotype").value = "All";
     document.getElementById("diet").value = "All";
+    document.getElementById("contrast").value = "None";
 
     updateFiltersState();
 

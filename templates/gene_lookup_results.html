@@ -109,6 +109,46 @@
 </section>
 
 <section>
+    <h2>Custom Graph Builder</h2>
+
+    <p class="note">
+        Build a custom sample-level expression plot using the current gene lookup results.
+    </p>
+
+    <div class="grid three-col">
+        <div>
+            <label for="customPlotType">Plot Type</label>
+            <select id="customPlotType">
+                <option value="boxplot">Boxplot + Points</option>
+                <option value="mean_line">Mean Line Across Age</option>
+            </select>
+        </div>
+
+        <div>
+            <label for="customGroupBy">Group / Color By</label>
+            <select id="customGroupBy">
+                <option value="Genotype">Genotype</option>
+                <option value="Sex">Sex</option>
+                <option value="Diet">Diet</option>
+                <option value="GenotypeDiet">Genotype + Diet</option>
+                <option value="GenotypePanelsDietLines">APP and WT panels; diet lines</option>
+                <option value="DietPanelsGenotypeLines">Control and Supplemented panels; genotype lines</option>
+            </select>
+        </div>
+
+        <div style="display:flex; align-items:end; gap:10px;">
+            <button type="button" onclick="initCustomGraphChart()">Update Plot</button>
+            <button type="button" onclick="downloadCustomPlot()">Download PNG</button>
+        </div>
+    </div>
+
+    <div id="customGraphContainer" style="margin-top:20px;">
+        <div id="customGraphMessage"></div>
+        <canvas id="customGraphChart"></canvas>
+    </div>
+</section>
+
+<section>
     <h2>Per-sample Expression and Metadata</h2>
     
     <div style="margin-bottom: 10px;">
